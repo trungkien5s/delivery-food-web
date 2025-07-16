@@ -24,7 +24,8 @@ import { CartItem } from './modules/cart.items/schemas/cart.items.schema';
 import { CartItemsModule } from './modules/cart.items/cart.items.module';
 import { Shipper } from './modules/shippers/schemas/shipper.schema';
 import { ShipperModule } from './modules/shippers/shipper.module';
-import { Chat } from './modules/chats/schemas/chat.schema';
+
+import { CategoriesModule } from './modules/categories/category.module';
 import { ChatModule } from './modules/chats/chat.module';
 
 @Module({
@@ -40,6 +41,7 @@ import { ChatModule } from './modules/chats/chat.module';
     OrdersModule,
     RestaurantsModule,
     ShipperModule,
+    CategoriesModule,
     ChatModule,
     ReviewsModule,
     ConfigModule.forRoot({ isGlobal: true }),
@@ -95,3 +97,4 @@ MailerModule.forRootAsync({
   ],
 })
 export class AppModule {}
+;

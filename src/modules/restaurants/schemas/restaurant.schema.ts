@@ -11,11 +11,11 @@ export class Restaurant {
   @Prop()
   description: string;
 
-  @Prop()
-  phone: string;
+@Prop({ unique: true, sparse: true })
+phone: string;
 
-  @Prop()
-  email: string;
+@Prop({ unique: true, sparse: true })
+email: string;
 
   @Prop()
   address: string;

@@ -11,6 +11,7 @@ import { CreateAuthDto } from '@/auth/dto/create-auth.dto';
 import dayjs from 'dayjs';
 import { v4 as uuidv4 } from 'uuid';
 import { MailerService } from '@nestjs-modules/mailer';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -151,6 +152,26 @@ async resetPassword(code: string, newPassword: string) {
   return { message: 'Đổi mật khẩu thành công' };
 }
 
+async changePassword(userId: string, oldPassword: string, newPassword: string) {
+  const user = await this.userModel.findById(userId);
+
+  if (!user) {
+    throw new BadRequestException('User not found');
+  }
+
+  const isMatch = await bcrypt.compare(oldPassword, user.password);
+  if (!isMatch) {
+    throw new BadRequestException('Old password is incorrect');
+  }
+
+  const hashedNewPassword = await hashPasswordHelper(newPassword);
+  await this.userModel.updateOne(
+    { _id: userId },
+    { password: hashedNewPassword }
+  );
+
+  return { message: 'Password changed successfully' };
+}
 
   async handleRegister(registerDto: CreateAuthDto) {
     const { name, email, password } = registerDto;

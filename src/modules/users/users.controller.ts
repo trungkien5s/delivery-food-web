@@ -27,6 +27,7 @@
   import { Public } from '@/decorator/customize';
   import { Roles } from '@/decorator/roles.decorator';
   import { RolesGuard } from '@/auth/passport/roles.guard';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
   @ApiTags('Accounts')
   @Controller('accounts')
@@ -75,6 +76,18 @@
     deleteCurrentUser(@Request() req) {
       return this.usersService.remove(req.user.id);
     }
+
+
+
+@Put('change-password')
+@ApiOperation({ summary: 'Change current user password' })
+@ApiBody({ type: ChangePasswordDto })
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+changePassword(@Request() req, @Body() dto: ChangePasswordDto) {
+  return this.usersService.changePassword(req.user.id, dto.oldPassword, dto.newPassword);
+}
+
 
     @Get(':account_id')
     @ApiOperation({ summary: 'Retrieve Account' })

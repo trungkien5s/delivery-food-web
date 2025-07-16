@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsPhoneNumber, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateShipperDto {
@@ -6,7 +6,7 @@ export class CreateShipperDto {
   @IsString()
   name: string;
 
-  @ApiProperty()
-  @IsString()
+  @ApiProperty({ example: '+84901234567' })
+  @IsPhoneNumber('VN', { message: 'Số điện thoại không hợp lệ (phải theo định dạng VN)' })
   phone: string;
 }

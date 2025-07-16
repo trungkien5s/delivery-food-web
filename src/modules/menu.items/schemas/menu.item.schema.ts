@@ -12,6 +12,9 @@ export class MenuItem {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true })
   restaurant: mongoose.Types.ObjectId;
 
+    @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Category' })
+  categoryId?: mongoose.Types.ObjectId;
+
   @Prop({ required: true })
   title: string;
 

@@ -1,22 +1,19 @@
-import { Restaurant } from '@/modules/restaurants/schemas/restaurant.schema';
+// src/modules/menus/schemas/menu.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
-export type MenuDocument = HydratedDocument<Menu>;
+export type MenuDocument = Menu & Document;
 
 @Schema({ timestamps: true })
 export class Menu {
-    @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Restaurant.name })
-    restaurant: mongoose.Schema.Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Restaurant', required: true })
+  restaurant: Types.ObjectId;
 
-    @Prop()
-    title: string;
+  @Prop({ required: true })
+  title: string;
 
-    @Prop()
-    description: string;
-
-    @Prop()
-    image: string;
+  @Prop()
+  image?: string;
 
 }
 

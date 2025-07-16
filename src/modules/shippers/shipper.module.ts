@@ -8,5 +8,6 @@ import { Module } from "@nestjs/common";
   imports: [MongooseModule.forFeature([{ name: Shipper.name, schema: ShipperSchema }])],
   controllers: [ShipperController],
   providers: [ShipperService],
+  exports: [ShipperService],
 })
 export class ShipperModule {}

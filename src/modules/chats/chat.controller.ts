@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { ChatService } from "./chat.service";
+import { ChatService } from "./schemas/chat.service";
 import { CreateChatDto } from "./dto/create-chat.dto";
 
 @ApiTags('Chat')

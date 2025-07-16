@@ -6,7 +6,5 @@ export class CreateCartDto {
   @ApiProperty({ example: 'userId', description: 'ID người dùng', required: false })
   user?: string;
 
-  @IsNotEmpty()
-  @ApiProperty({ example: 'restaurantId', description: 'ID nhà hàng' })
-  restaurant: string;
+
 }

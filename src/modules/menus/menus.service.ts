@@ -1,12 +1,13 @@
 // src/modules/menus/menus.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
 import { Menu, MenuDocument } from './schemas/menu.schema';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
 import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
-
+import * as fs from 'fs';
+import { v2 as cloudinaryLib } from 'cloudinary';
 @Injectable()
 export class MenusService {
 constructor(
@@ -15,22 +16,38 @@ constructor(
 
   @InjectModel(Restaurant.name)
   private restaurantModel: Model<RestaurantDocument>, 
-) {}
 
-  async create(dto: CreateMenuDto) {
-    // Kiểm tra ID hợp lệ
+    @Inject('CLOUDINARY')
+    private cloudinary: typeof cloudinaryLib, 
+  ) {}
+
+  async create(dto: CreateMenuDto, file?: Express.Multer.File) {
     if (!isValidObjectId(dto.restaurant)) {
       throw new NotFoundException('ID nhà hàng không hợp lệ');
     }
 
-    // Kiểm tra nhà hàng có tồn tại không
     const restaurant = await this.restaurantModel.findById(dto.restaurant);
     if (!restaurant) {
       throw new NotFoundException('Không tìm thấy nhà hàng');
     }
 
-    // Tạo menu
-    const created = await this.menuModel.create(dto);
+    let imageUrl: string | undefined;
+
+    if (file) {
+      const result = await this.cloudinary.uploader.upload(file.path, {
+        folder: 'menus',
+      });
+      imageUrl = result.secure_url;
+
+      // xoá file tạm sau khi upload
+      fs.unlinkSync(file.path);
+    }
+
+    const created = await this.menuModel.create({
+      ...dto,
+      image: imageUrl,
+    });
+
     return created;
   }
   async findAll() {

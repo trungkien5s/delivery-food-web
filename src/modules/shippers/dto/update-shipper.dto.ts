@@ -1,4 +1,5 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsBoolean } from "class-validator";
 
 export class UpdateShipperDto {
   @ApiPropertyOptional()
@@ -7,8 +8,9 @@ export class UpdateShipperDto {
   @ApiPropertyOptional()
   phone?: string;
 
-  @ApiPropertyOptional({ enum: ['available', 'delivering', 'offline'] })
-  status?: 'available' | 'delivering' | 'offline';
+  @ApiProperty({ description: 'Shipper có đang online hay không' })
+  @IsBoolean()
+  isOnline: boolean;
 
   @ApiPropertyOptional()
   rating?: number;

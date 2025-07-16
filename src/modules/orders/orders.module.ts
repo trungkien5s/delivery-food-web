@@ -10,6 +10,7 @@ import { CartItem, CartItemSchema } from '../cart.items/schemas/cart.items.schem
 import { MenuItemOption, MenuItemOptionSchema } from '../menu.item.options/schemas/menu.item.option.schema';
 import { OrderDetail, OrderDetailSchema } from '../order.detail/schemas/order.detail.schema';
 import { Shipper, ShipperSchema } from '../shippers/schemas/shipper.schema';
+import { ShipperModule } from '../shippers/shipper.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { Shipper, ShipperSchema } from '../shippers/schemas/shipper.schema';
 
   
     ]),
+    ShipperModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

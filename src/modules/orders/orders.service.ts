@@ -1,8 +1,8 @@
 // src/modules/orders/orders.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Body, ForbiddenException, Injectable, NotFoundException, Param, Put, Req } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, isValidObjectId } from 'mongoose';
-import { Order, OrderDocument } from './schemas/order.schema';
+import { Model, Types, isValidObjectId } from 'mongoose';
+import { Order, OrderDocument, OrderStatus } from './schemas/order.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
@@ -12,6 +12,9 @@ import { CartItem } from '../cart.items/schemas/cart.items.schema';
 import { MenuItem } from '../menu.items/schemas/menu.item.schema';
 import { MenuItemOption } from '../menu.item.options/schemas/menu.item.option.schema';
 import { OrderDetail } from '../order.detail/schemas/order.detail.schema';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { Shipper, ShipperDocument } from '../shippers/schemas/shipper.schema';
+import { ShipperService } from '../shippers/shipper.service';
 
 @Injectable()
 export class OrdersService {
@@ -22,11 +25,14 @@ export class OrdersService {
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
     @InjectModel(MenuItemOption.name) private menuItemOptionModel: Model<MenuItemOption>,
     @InjectModel(OrderDetail.name) private orderDetailModel: Model<OrderDetail>,
+    @InjectModel(Shipper.name) private shipperModel: Model<ShipperDocument>,
+      private readonly shipperService: ShipperService, // ✅ inject
+
+
 
 
   ) {}
-
-async createFromCart(userId: string, orderTime?: Date) {
+async createFromCart(userId: string, restaurantId: string, orderTime?: Date) {
   const cart = await this.cartModel.findOne({ user: userId });
   if (!cart) throw new NotFoundException('Không tìm thấy giỏ hàng');
 
@@ -34,7 +40,10 @@ async createFromCart(userId: string, orderTime?: Date) {
     .find({ cart: cart._id })
     .populate({
       path: 'menuItem',
-      select: 'basePrice title',
+      populate: {
+        path: 'menu',
+        populate: { path: 'restaurant' },
+      },
     })
     .populate({
       path: 'selectedOptions',
@@ -45,15 +54,20 @@ async createFromCart(userId: string, orderTime?: Date) {
     throw new NotFoundException('Giỏ hàng trống');
   }
 
-  // ✅ Gộp các món giống nhau (menuItem + selectedOptions)
+  // ✅ Lọc ra các món thuộc nhà hàng được chọn
+  const items = cartItems.filter(item => {
+    const rId = (item.menuItem as any)?.menu?.restaurant?._id?.toString();
+    return rId === restaurantId;
+  });
+
+  if (items.length === 0) {
+    throw new BadRequestException('Không có món nào thuộc nhà hàng đã chọn');
+  }
+
+  // ✅ Gom món giống nhau
   const itemMap = new Map<string, { menuItem: any; quantity: number; selectedOptions: any[] }>();
-  for (const item of cartItems) {
-    let menuItemId: string;
-    if (item.menuItem && typeof item.menuItem === 'object' && '_id' in item.menuItem) {
-      menuItemId = (item.menuItem as any)._id.toString();
-    } else {
-      menuItemId = item.menuItem?.toString();
-    }
+  for (const item of items) {
+    const menuItemId = (item.menuItem as any)._id.toString();
     const selectedOptionIds = (item.selectedOptions || []).map(opt => opt._id.toString()).sort();
     const key = `${menuItemId}::${selectedOptionIds.join(',')}`;
 
@@ -69,7 +83,7 @@ async createFromCart(userId: string, orderTime?: Date) {
     }
   }
 
-  // ✅ Tính tổng giá
+  //  Tính tổng giá
   let totalPrice = 0;
   for (const { menuItem, quantity, selectedOptions } of itemMap.values()) {
     const optionExtra = selectedOptions.reduce((sum, opt: any) => sum + (opt.priceAdjustment || 0), 0);
@@ -77,25 +91,20 @@ async createFromCart(userId: string, orderTime?: Date) {
     totalPrice += itemPrice;
   }
 
-  // ✅ Lấy restaurant từ một menuItem (giả định giỏ chỉ chứa 1 nhà hàng)
-  const firstMenuItem = cartItems[0].menuItem as any;
-  const restaurant = cart.restaurant;
-  if (!restaurant) throw new NotFoundException('Không xác định được nhà hàng từ giỏ hàng');
-
   const now = orderTime || new Date();
   const deliveryTime = new Date(now.getTime() + 45 * 60 * 1000);
 
-  // ✅ Tạo đơn hàng
+  // Tạo đơn hàng
   const order = await this.orderModel.create({
     user: userId,
-    restaurant,
+    restaurant: restaurantId,
     totalPrice,
     status: 'PENDING',
     orderTime: now,
     deliveryTime,
   });
 
-  // ✅ Tạo chi tiết đơn hàng
+  //  Tạo orderDetail
   for (const { menuItem, quantity, selectedOptions } of itemMap.values()) {
     const optionExtra = selectedOptions.reduce((sum, opt: any) => sum + (opt.priceAdjustment || 0), 0);
     const price = (menuItem.basePrice + optionExtra) * quantity;
@@ -109,14 +118,48 @@ async createFromCart(userId: string, orderTime?: Date) {
     });
   }
 
-  // ✅ Xoá toàn bộ cartItems trong giỏ
-  await this.cartItemModel.deleteMany({ cart: cart._id });
+  //  Xoá các món thuộc nhà hàng vừa đặt
+  await this.cartItemModel.deleteMany({
+    cart: cart._id,
+    menuItem: { $in: items.map(i => (i.menuItem as any)._id) },
+  });
 
-  return order;
+  return this.orderModel.findById(order._id)
+  .populate('user')
+  .populate('restaurant');
+
 }
 
 
 
+
+
+// orders.service.ts
+async updateStatus(orderId: string, status: OrderStatus) {
+  if (!isValidObjectId(orderId)) throw new NotFoundException('ID không hợp lệ');
+
+  const order = await this.orderModel.findById(orderId);
+  if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+  // ✅ Optional: Kiểm tra luồng trạng thái hợp lệ
+  const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+    [OrderStatus.PENDING]: [OrderStatus.ASSIGNED, OrderStatus.CANCELLED],
+    [OrderStatus.ASSIGNED]: [OrderStatus.DELIVERING, OrderStatus.CANCELLED],
+    [OrderStatus.DELIVERING]: [OrderStatus.DELIVERED],
+    [OrderStatus.DELIVERED]: [],
+    [OrderStatus.CANCELLED]: [],
+  };
+
+  const current = order.status;
+  if (!validTransitions[current].includes(status)) {
+    throw new Error(`Không thể chuyển từ ${current} sang ${status}`);
+  }
+
+  order.status = status;
+  await order.save();
+
+  return order;
+}
 
 
 async findByUser(userId: string) {
@@ -151,4 +194,92 @@ async findByUser(userId: string) {
     if (!deleted) throw new NotFoundException('Không tìm thấy đơn hàng để xoá');
     return { message: 'Xoá đơn hàng thành công' };
   }
+  async assignShipper(orderId: string, shipperId: string) {
+  // Kiểm tra ID
+  if (!isValidObjectId(orderId) || !isValidObjectId(shipperId)) {
+    throw new NotFoundException('ID không hợp lệ');
+  }
+
+  const order = await this.orderModel.findById(orderId);
+  if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+  if (order.status !== OrderStatus.PENDING) {
+    throw new Error(`Đơn hàng không ở trạng thái có thể nhận (hiện tại: ${order.status})`);
+  }
+
+  // Có thể kiểm tra shipper tồn tại (nếu cần)
+  const shipper = await this.shipperModel.findById(shipperId);
+  if (!shipper) throw new NotFoundException('Shipper không tồn tại');
+
+    if (!shipper.isOnline) {
+    throw new ForbiddenException('Shipper hiện đang offline, không thể gán đơn hàng');
+  }
+
+  // Gán shipper và cập nhật trạng thái
+order.shipper = new Types.ObjectId(shipperId);  
+order.status = OrderStatus.ASSIGNED;
+  await order.save();
+
+  await this.shipperService.addOrderToShipper(shipperId, order._id.toString());
+
+  return order;
+
 }
+  // orders.service.ts
+async updateStatusByShipper(
+  orderId: string,
+  shipperId: string,
+  newStatus: OrderStatus,
+) {
+  // ✅ Kiểm tra hợp lệ ID
+  if (!isValidObjectId(orderId) || !isValidObjectId(shipperId)) {
+    throw new NotFoundException('ID không hợp lệ');
+  }
+
+  // ✅ Tìm đơn hàng
+  const order = await this.orderModel.findById(orderId);
+  if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+  // ✅ Kiểm tra shipper có được gán cho đơn này không
+  if (!order.shipper) {
+    throw new ForbiddenException('Đơn hàng chưa có shipper');
+  }
+
+  if (order.shipper.toString() !== shipperId.toString()) {
+    throw new ForbiddenException('Bạn không phải shipper của đơn hàng này');
+  }
+
+  // ✅ Kiểm tra trạng thái hợp lệ
+  const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+    PENDING: [],
+    ASSIGNED: [OrderStatus.DELIVERING],
+    DELIVERING: [OrderStatus.DELIVERED],
+    DELIVERED: [],
+    CANCELLED: [],
+  };
+
+  const allowedNext = validTransitions[order.status] || [];
+  if (!allowedNext.includes(newStatus)) {
+    throw new ForbiddenException(
+      `Không thể chuyển từ ${order.status} sang ${newStatus}`,
+    );
+  }
+
+  // ✅ Cập nhật trạng thái đơn
+  order.status = newStatus;
+  await order.save();
+
+  // ✅ Nếu giao hàng thành công → xoá khỏi shipper.currentOrders
+  if (newStatus === OrderStatus.DELIVERED) {
+    await this.shipperService.removeOrderFromShipper(shipperId, order._id.toString());
+  }
+
+  return order;
+}
+
+
+
+
+
+}
+

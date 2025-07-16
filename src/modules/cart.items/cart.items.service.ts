@@ -36,7 +36,7 @@ async create(userId: string, dto: CreateCartItemDto) {
     throw new NotFoundException('MenuItem ID không hợp lệ');
   }
 
-  // Lấy thông tin menuItem và nhà hàng
+  // Lấy menuItem kèm menu và nhà hàng
   const newMenuItem = await this.menuItemModel.findById(dto.menuItem).populate({
     path: 'menu',
     populate: { path: 'restaurant', select: '_id' },
@@ -56,29 +56,13 @@ async create(userId: string, dto: CreateCartItemDto) {
     }
   }
 
-  const cart = await this.cartModel.findOne({ user: userId });
-  if (!cart) throw new NotFoundException('Không tìm thấy giỏ hàng');
-
-  // Lấy restaurant ID từ menu
-  const restaurantId = (newMenuItem.menu as any)?.restaurant?._id?.toString();
-  if (!restaurantId) {
-    throw new NotFoundException(`Không xác định được nhà hàng từ menu của món ăn có ID: ${dto.menuItem}`);
+  // ✅ Tìm hoặc tạo cart
+  let cart = await this.cartModel.findOne({ user: userId });
+  if (!cart) {
+    cart = await this.cartModel.create({ user: userId });
   }
 
-  // Kiểm tra các món trong cart để đảm bảo cùng nhà hàng
-  const existingItems = await this.cartItemModel.find({ cart: cart._id }).populate({
-    path: 'menuItem',
-    populate: { path: 'menu', populate: { path: 'restaurant', select: '_id' } },
-  });
-
-  if (existingItems.length > 0) {
-    const existingRestaurantId = (existingItems[0].menuItem as any)?.menu?.restaurant?._id?.toString();
-    if (existingRestaurantId && existingRestaurantId !== restaurantId) {
-      throw new NotFoundException('Bạn chỉ có thể đặt món từ một nhà hàng trong mỗi đơn hàng.');
-    }
-  }
-
-  // ✅ Nếu đã có món giống hệt (cùng menuItem + selectedOptions), cộng dồn
+  // ✅ Nếu đã có món giống hệt → cộng dồn
   const existingItem = await this.cartItemModel.findOne({
     cart: cart._id,
     menuItem: dto.menuItem,
@@ -91,7 +75,7 @@ async create(userId: string, dto: CreateCartItemDto) {
     return existingItem;
   }
 
-  // ✅ Tạo mới nếu chưa có
+  // ✅ Thêm mới
   const created = await this.cartItemModel.create({
     cart: cart._id,
     menuItem: dto.menuItem,
@@ -101,6 +85,8 @@ async create(userId: string, dto: CreateCartItemDto) {
 
   return created;
 }
+
+
 
 
 
