@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { IsMongoId, IsNotEmpty, IsOptional, IsIn } from 'class-validator';
+import { IsMongoId, IsNotEmpty, IsOptional, IsIn, IsBoolean } from 'class-validator';
 
 export class UpdateUserDto {
   @IsMongoId({ message: '_id không hợp lệ' })
@@ -18,6 +18,14 @@ export class UpdateUserDto {
   @IsOptional()
   image: string;
 
+
+    @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isVerified?: boolean;
   @IsOptional()
   @IsIn(['USERS', 'ADMIN'], { message: 'role phải là USER hoặc ADMIN' })
   role?: string;

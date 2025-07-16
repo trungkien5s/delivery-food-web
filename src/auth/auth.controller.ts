@@ -1,12 +1,13 @@
-import { Controller, Get, Post, Body, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Request, UseGuards, Param } from '@nestjs/common';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './passport/local-auth.guard';
 import { JwtAuthGuard } from './passport/jwt-auth.guard';
 import { Public, ResponseMessage } from '@/decorator/customize';
 import { MailerService } from '@nestjs-modules/mailer';
-import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse, ApiParam } from '@nestjs/swagger';
 import { LoginAuthDto } from './dto/login-auth.dto';
+import { ActivateAccountDto } from './dto/activate-account.dto';
 
 // Bạn có thể tạo DTO riêng cho response nếu muốn mô tả chi tiết hơn
 class LoginResponseDto {
@@ -45,6 +46,33 @@ export class AuthController {
     return this.authService.handleRegister(regiseterDto);
   }
 
+  @Post('activate')
+  @Public()
+  @ResponseMessage("Account activated successfully")
+  @ApiOperation({ summary: 'Activate account with activation code' })
+  @ApiBody({ type: ActivateAccountDto })
+  @ApiOkResponse({ description: 'Account activated successfully', type: MessageResponseDto })
+  activateAccount(@Body() activateDto: ActivateAccountDto) {
+    return this.authService.activateAccount(activateDto);
+  }
+
+  @Post('resend-activation')
+  @Public()
+  @ResponseMessage("Activation code resent successfully")
+  @ApiOperation({ summary: 'Resend activation code' })
+  @ApiBody({ 
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', format: 'email' }
+      }
+    }
+  })
+  @ApiOkResponse({ description: 'Activation code resent successfully', type: MessageResponseDto })
+  resendActivationCode(@Body() body: { email: string }) {
+    return this.authService.resendActivationCode(body.email);
+  }
+
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @ResponseMessage("Logout successfully")
@@ -55,24 +83,4 @@ export class AuthController {
     return this.authService.logout(req.user);
   }
 
-  @Get('mail')
-  @Public()
-  @ApiOperation({ summary: 'Test sending email' })
-  @ApiOkResponse({ description: 'Email sent successfully', type: MessageResponseDto })
-  testMail() {
-    this.mailerService.sendMail({
-      to: 'kienkk24052004@gmail.com',
-      subject: 'Testing Nest MailerModule ✔',
-      text: 'welcome',
-      template: 'register',
-      context: {
-        name: 'Trung Kiên',
-        activationCode: 123456,
-      },
-    });
-
-    return {
-      message: 'Email sent successfully!',
-    };
-  }
 }

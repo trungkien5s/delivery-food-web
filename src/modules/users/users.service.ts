@@ -92,6 +92,32 @@ export class UsersService {
     return { message: 'Cập nhật thành công' };
   }
 
+  
+async activateUser(userId: string) {
+  // Cập nhật isActive = true và xóa activationCode
+  return await this.userModel.findByIdAndUpdate(
+    userId,
+    {
+      isActive: true,
+      activationCode: null,
+      activationCodeExpiry: null,
+      activatedAt: new Date()
+    },
+    { new: true }
+  );
+}
+
+async updateActivationCode(userId: string, activationCode: string, expiry: Date) {
+  return await this.userModel.findByIdAndUpdate(
+    userId,
+    {
+      activationCode,
+      activationCodeExpiry: expiry
+    },
+    { new: true }
+  );
+}
+
   async remove(_id: string) {
     if (!mongoose.isValidObjectId(_id)) {
       throw new BadRequestException('Id không đúng định dạng');
@@ -182,26 +208,26 @@ async changePassword(userId: string, oldPassword: string, newPassword: string) {
     }
 
     const hashPassword = await hashPasswordHelper(password);
-    const codeId = uuidv4();
+const activationCode = Math.floor(100000 + Math.random() * 900000).toString();// hoặc random 6 số
+const user = await this.userModel.create({
+  name,
+  email,
+  password: hashPassword,
+  isActive: false,
+  activationCode,
+  activationCodeExpiry: dayjs().add(30, 'minutes').toDate(), // 30 phút
+});
 
-    const user = await this.userModel.create({
-      name,
-      email,
-      password: hashPassword,
-      isActive: false,
-      codeId: codeId,
-      codeExpired: dayjs().add(30, 'minutes').toDate(),
-    });
+await this.mailerService.sendMail({
+  to: user.email,
+  subject: 'Activate your account at @trungkien',
+  template: 'register',
+  context: {
+    name: user?.name ?? user.email,
+    activationCode: activationCode, // ✅ sử dụng activationCode
+  },
+});
 
-    await this.mailerService.sendMail({
-      to: user.email,
-      subject: 'Activate your account at @trungkien',
-      template: 'register',
-      context: {
-        name: user?.name ?? user.email,
-        activationCode: codeId,
-      },
-    });
 
     return { _id: user._id };
   }

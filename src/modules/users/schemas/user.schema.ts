@@ -35,8 +35,16 @@ export class User {
     @Prop()
     codeId: string;
 
+
+      @Prop()
+  activationCode: string;
+
+  @Prop()
+  activationCodeExpiry: Date;
+
     @Prop()
     codeExpired: Date;
+
 
     // 🔒 Thêm phần này
     @Prop()
