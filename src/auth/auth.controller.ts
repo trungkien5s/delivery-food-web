@@ -9,7 +9,7 @@ import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth, ApiOkResponse, ApiCreate
 import { LoginAuthDto } from './dto/login-auth.dto';
 import { ActivateAccountDto } from './dto/activate-account.dto';
 
-// Bạn có thể tạo DTO riêng cho response nếu muốn mô tả chi tiết hơn
+
 class LoginResponseDto {
   access_token: string;
 }

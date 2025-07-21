@@ -1,33 +1,45 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
-import { ChatService } from "./schemas/chat.service";
-import { CreateChatDto } from "./dto/create-chat.dto";
+import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { ChatService } from './service/chat.service';
+
+import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
+import { CreateRoomDto } from './dto/create-message.dto';
+import { SendMessageDto } from './dto/chat-message.dto';
 
 @ApiTags('Chat')
-@Controller('chats')
+@Controller('chat')
 export class ChatController {
-  constructor(private readonly service: ChatService) {}
+  constructor(private readonly chatService: ChatService) {}
 
-  @Post()
-  create(@Body() dto: CreateChatDto) {
-    return this.service.create(dto);
+  @UseGuards(JwtAuthGuard)
+  @Post('rooms')
+  createRoom(@Body() dto: CreateRoomDto, @Request() req) { // Added req parameter
+    return this.chatService.getOrCreateRoom(dto, req.user._id);
   }
 
-  @Get('conversation')
-  getConversation(
-    @Query('user') user: string,
-    @Query('shipper') shipper: string,
+  @UseGuards(JwtAuthGuard)
+  @Get('rooms/me')
+  getMyRooms(@Request() req) {
+    return this.chatService.getUserRooms(req.user._id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('rooms/:roomId/messages')
+  sendMessage(
+    @Param('roomId') roomId: string,
+    @Body() dto: SendMessageDto,
+    @Request() req
   ) {
-    return this.service.findConversation(user, shipper);
+    return this.chatService.createMessage({
+      roomId,
+      content: dto.content,
+      senderId: req.user._id,
+    });
   }
-  @Get('/order/:orderId')
-getChatByOrder(@Param('orderId') orderId: string) {
-  return this.service.findByOrder(orderId);
-}
 
-
-  @Patch(':id/read')
-  markAsRead(@Param('id') id: string) {
-    return this.service.markAsRead(id);
+  @UseGuards(JwtAuthGuard)
+  @Get('rooms/:roomId/messages')
+  getMessages(@Param('roomId') roomId: string, @Request() req) { // Added req for security
+    return this.chatService.getMessages(roomId, req.user._id);
   }
 }

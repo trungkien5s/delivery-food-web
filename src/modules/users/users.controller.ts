@@ -57,7 +57,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     getCurrentUser(@Request() req) {
-      return this.usersService.findOne(req.user.id);
+      return this.usersService.findOne(req.user._id);
     }
 
     @Put('me')
@@ -66,7 +66,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     updateCurrentUser(@Request() req, @Body() dto: UpdateUserDto) {
-      return this.usersService.update(req.user.id, dto);
+      return this.usersService.update(req.user._id, dto);
     }
 
     @Delete('me')
@@ -74,7 +74,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     deleteCurrentUser(@Request() req) {
-      return this.usersService.remove(req.user.id);
+      return this.usersService.remove(req.user._id);
     }
 
 
@@ -85,7 +85,9 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 changePassword(@Request() req, @Body() dto: ChangePasswordDto) {
-  return this.usersService.changePassword(req.user.id, dto.oldPassword, dto.newPassword);
+    console.log('User ID from token:', req.user.id); // Debug log
+
+  return this.usersService.changePassword(req.user._id, dto.oldPassword, dto.newPassword);
 }
 
 
