@@ -85,11 +85,8 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 changePassword(@Request() req, @Body() dto: ChangePasswordDto) {
-    console.log('User ID from token:', req.user.id); // Debug log
-
   return this.usersService.changePassword(req.user._id, dto.oldPassword, dto.newPassword);
 }
-
 
     @Get(':account_id')
     @ApiOperation({ summary: 'Retrieve Account' })

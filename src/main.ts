@@ -28,7 +28,11 @@ const port = configService.get<number>('PORT') || 8000;
   const document = SwaggerModule.createDocument(app, config);
 
   SwaggerModule.setup('docs', app, document); 
- 
+ app.enableCors({
+  origin: 'http://localhost:3000', // Cho phép FE React truy cập
+  credentials: true,              // Nếu bạn gửi token/cookie
+});
+
 
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}/api/v1`);
