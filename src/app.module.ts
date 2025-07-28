@@ -69,7 +69,7 @@ MailerModule.forRootAsync({
       },
     },
     defaults: {
-      from: '"No Reply" <no-reply@localhost>',
+        from: '"EatNow Support" <noreply@eatnow.com>',
     },
     template: {
       dir: process.cwd() + '/src/mail/templates',

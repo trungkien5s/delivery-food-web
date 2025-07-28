@@ -141,7 +141,7 @@ async updateStatus(orderId: string, status: OrderStatus) {
   const order = await this.orderModel.findById(orderId);
   if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
 
-  // ✅ Optional: Kiểm tra luồng trạng thái hợp lệ
+ 
   const validTransitions: Record<OrderStatus, OrderStatus[]> = {
     [OrderStatus.PENDING]: [OrderStatus.ASSIGNED, OrderStatus.CANCELLED],
     [OrderStatus.ASSIGNED]: [OrderStatus.DELIVERING, OrderStatus.CANCELLED],
@@ -231,16 +231,16 @@ async updateStatusByShipper(
   shipperId: string,
   newStatus: OrderStatus,
 ) {
-  // ✅ Kiểm tra hợp lệ ID
+
   if (!isValidObjectId(orderId) || !isValidObjectId(shipperId)) {
     throw new NotFoundException('ID không hợp lệ');
   }
 
-  // ✅ Tìm đơn hàng
+
   const order = await this.orderModel.findById(orderId);
   if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
 
-  // ✅ Kiểm tra shipper có được gán cho đơn này không
+
   if (!order.shipper) {
     throw new ForbiddenException('Đơn hàng chưa có shipper');
   }
@@ -249,7 +249,7 @@ async updateStatusByShipper(
     throw new ForbiddenException('Bạn không phải shipper của đơn hàng này');
   }
 
-  // ✅ Kiểm tra trạng thái hợp lệ
+
   const validTransitions: Record<OrderStatus, OrderStatus[]> = {
     PENDING: [],
     ASSIGNED: [OrderStatus.DELIVERING],
@@ -265,7 +265,7 @@ async updateStatusByShipper(
     );
   }
 
-  // ✅ Cập nhật trạng thái đơn
+  
   order.status = newStatus;
   await order.save();
 

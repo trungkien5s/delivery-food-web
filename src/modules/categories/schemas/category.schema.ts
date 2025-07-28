@@ -12,7 +12,7 @@ export class Category extends Document {
   iconUrl?: string;
 
   @Prop()
-  slug?: string; // VD: 'com', 'tra-sua'
+  slug?: string; 
 }
 
 export const CategorySchema = SchemaFactory.createForClass(Category);
