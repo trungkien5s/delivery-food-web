@@ -36,6 +36,24 @@ export class AuthController {
   handleLogin(@Request() req) {
     return this.authService.login(req.user);
   }
+  @Post('refresh-token')
+@Public()
+@ResponseMessage('Refresh access token successfully')
+@ApiOperation({ summary: 'Refresh access token using refresh token' })
+@ApiBody({
+  schema: {
+    type: 'object',
+    properties: {
+      userId: { type: 'string' },
+      refreshToken: { type: 'string' }
+    }
+  }
+})
+@ApiOkResponse({ description: 'New access token returned', type: LoginResponseDto })
+async refreshAccessToken(@Body() body: { userId: string; refreshToken: string }) {
+  return this.authService.refreshToken(body.userId, body.refreshToken);
+}
+
 
   @Post('register')
   @Public()

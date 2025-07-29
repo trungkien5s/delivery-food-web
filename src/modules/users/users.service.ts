@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -77,19 +77,33 @@ export class UsersService {
 }
 
 
-  async findOne(id: string) {
-    if (!mongoose.isValidObjectId(id)) {
-      throw new BadRequestException('Id không đúng định dạng');
-    }
-    return this.userModel.findById(id).select('-password');
+async findOne(id: string) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw new BadRequestException('Id không đúng định dạng');
   }
+
+  const user = await this.userModel.findById(id).select('-password');
+
+  if (!user) {
+    throw new NotFoundException('Không tìm thấy người dùng');
+  }
+
+  return user;
+}
+
 
   async update(id: string, dto: UpdateUserDto) {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('Id không đúng định dạng');
     }
-    await this.userModel.updateOne({ _id: id }, { ...dto });
-    return { message: 'Cập nhật thành công' };
+   const result = await this.userModel.updateOne({ _id: id }, { ...dto });
+
+if (result.matchedCount === 0) {
+  throw new NotFoundException('Không tìm thấy người dùng');
+}
+
+return { message: 'Cập nhật thành công' };
+
   }
 
   
@@ -118,13 +132,20 @@ async updateActivationCode(userId: string, activationCode: string, expiry: Date)
   );
 }
 
-  async remove(_id: string) {
-    if (!mongoose.isValidObjectId(_id)) {
-      throw new BadRequestException('Id không đúng định dạng');
-    }
-    await this.userModel.deleteOne({ _id });
-    return { message: 'Xoá thành công' };
+async remove(_id: string) {
+  if (!mongoose.isValidObjectId(_id)) {
+    throw new BadRequestException('Id không đúng định dạng');
   }
+
+  const result = await this.userModel.deleteOne({ _id });
+
+  if (result.deletedCount === 0) {
+    throw new NotFoundException('Không tìm thấy người dùng để xoá');
+  }
+
+  return { message: 'Xoá thành công' };
+}
+
 
   async changeRole(id: string, role: string) {
     if (!mongoose.isValidObjectId(id)) {
@@ -140,8 +161,8 @@ async updateActivationCode(userId: string, activationCode: string, expiry: Date)
       throw new BadRequestException('Email không tồn tại');
     }
 
- const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-const codeExpired = dayjs().add(10, 'minutes').toDate();
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeExpired = dayjs().add(10, 'minutes').toDate();
 
 await this.userModel.updateOne({ _id: user._id }, { resetCode, codeExpired });
 
@@ -178,6 +199,28 @@ async resetPassword(code: string, newPassword: string) {
   return { message: 'Đổi mật khẩu thành công' };
 }
 
+  async saveRefreshToken(userId: string, refreshToken: string, expiry: Date) {
+    return this.userModel.findByIdAndUpdate(
+      userId,
+      {
+        refreshToken,
+        refreshTokenExpiry: expiry,
+      },
+      { new: true }
+    );
+  }
+
+    async findById(userId: string): Promise<User | null> {
+    return this.userModel.findById(userId).exec();
+  }
+
+  async removeRefreshToken(userId: string) {
+    return this.userModel.findByIdAndUpdate(
+      userId,
+      { $unset: { refreshToken: "", refreshTokenExpiry: "" } },
+      { new: true }
+    );
+  }
 async changePassword(userId: string, oldPassword: string, newPassword: string) {
   const user = await this.userModel.findById(userId);
 
@@ -224,7 +267,7 @@ await this.mailerService.sendMail({
   template: 'register',
   context: {
     name: user?.name ?? user.email,
-    activationCode: activationCode, // ✅ sử dụng activationCode
+    activationCode: activationCode, 
   },
 });
 

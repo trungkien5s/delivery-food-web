@@ -45,8 +45,14 @@ phone: string;
     @Prop()
     codeExpired: Date;
 
+    @Prop()
+refreshToken: string;
 
-    // 🔒 Thêm phần này
+@Prop()
+  refreshTokenExpiry?: Date;
+
+
+  _id: string
     @Prop()
     resetCode: string;
 

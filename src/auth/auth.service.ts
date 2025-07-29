@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { ActivateAccountDto } from './dto/activate-account.dto';
 import { MailerService } from '@nestjs-modules/mailer';
-
+import { randomBytes } from 'crypto';
 @Injectable()
 export class AuthService {
   constructor(
@@ -25,26 +25,39 @@ export class AuthService {
   }
 
   async login(user: any) {
-    // Kiểm tra xem account đã được activate chưa
     if (!user.isActive) {
-      throw new BadRequestException('Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email và kích hoạt tài khoản.');
+      throw new BadRequestException('Tài khoản chưa được kích hoạt.');
     }
+    const payload = { username: user.email, sub: user._id, role: user.role };
+    const accessToken = this.jwtService.sign(payload, {
+  expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRED, 
+});
 
-    const payload = {
-      username: user.email,
-      sub: user._id,
-      role: user.role,
-    };
-    
+    // Tạo refresh token (có thể là chuỗi ngẫu nhiên hoặc JWT)
+    const refreshToken = randomBytes(64).toString('hex');
+    const refreshTokenExpiry = new Date();
+    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7); 
+
+    // Lưu refreshToken vào DB
+    await this.usersService.saveRefreshToken(user._id, refreshToken, refreshTokenExpiry);
+
     return {
-      user: {
-        _id: user._id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
-      access_token: this.jwtService.sign(payload),
+      user: { _id: user._id, email: user.email, name: user.name, role: user.role },
+      access_token: accessToken,
+      refresh_token: refreshToken,
     };
+  }
+
+  async refreshToken(userId: string, refreshToken: string) {
+    // Kiểm tra refresh token trong DB
+    const user = await this.usersService.findById(userId);
+    if (!user || user.refreshToken !== refreshToken || new Date() > user.refreshTokenExpiry) {
+      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn.');
+    }
+    // Cấp access token mới
+    const payload = { username: user.email, sub: user._id, role: user.role };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
+    return { access_token: accessToken };
   }
 
   handleRegister = async (registerDto: CreateAuthDto) => {
@@ -130,7 +143,9 @@ export class AuthService {
   }
 
   // Thêm method logout
-  async logout(user: any) {
+   async logout(user: any) {
+    // Xóa refresh token khỏi DB
+    await this.usersService.removeRefreshToken(user._id || user.sub);
     return {
       message: 'Đăng xuất thành công',
       statusCode: 200,
