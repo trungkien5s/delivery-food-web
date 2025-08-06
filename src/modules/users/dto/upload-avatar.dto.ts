@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Express } from 'express';
 
 export class UploadAvatarDto {
   @ApiProperty({
@@ -6,5 +7,5 @@ export class UploadAvatarDto {
     format: 'binary',
     description: 'Avatar image file (JPEG, PNG, GIF)',
   })
-  avatar: any;
+  avatar: Express.Multer.File;
 }

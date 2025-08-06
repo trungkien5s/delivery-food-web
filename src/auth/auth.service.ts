@@ -152,7 +152,7 @@ export class AuthService {
       data: {
         userId: user._id || user.sub,
         email: user.email || user.username,
-        logoutTime: new Date().toISOString()
+          logoutTime: new Date().toISOString( )
       }
     };
   }

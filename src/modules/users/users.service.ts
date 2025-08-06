@@ -47,17 +47,33 @@ export class UsersService {
     return { _id: user._id };
   }
 
-  async findAll(query: string, current: number, pageSize: number, role?: string) {
-    const { filter, sort } = aqp(query);
-    if (filter.current) delete filter.current;
-    if (filter.pageSize) delete filter.pageSize;
+  async findAll(
+    query: string,
+    current = 1,
+    pageSize = 10,
+    role?: string,
+  ): Promise<{ results: User[]; totalPages: number }> {
+  const { filter: rawFilter, sort: rawSort } = aqp(query);
 
-    if (!current) current = 1;
-    if (!pageSize) pageSize = 10;
+// Loại bỏ pageSize, current khỏi filter
+const { current: _c, pageSize: _p, ...filter } = rawFilter;
 
-    if (role) {
-      filter.role = role;
-    }
+// Thêm điều kiện lọc theo role nếu có
+if (role) {
+  filter.role = role;
+}
+
+// Chuyển sort về kiểu đúng
+const parsedSort: Record<string, any> = rawSort || {};
+const sort: Record<string, 1 | -1> = {};
+
+for (const key in parsedSort) {
+  const value = Number(parsedSort[key]);
+  if (value === 1 || value === -1) {
+    sort[key] = value;
+  }
+}
+
 
     const totalItems = await this.userModel.countDocuments(filter);
     const totalPages = Math.ceil(totalItems / pageSize);
@@ -68,7 +84,7 @@ export class UsersService {
       .limit(pageSize)
       .skip(skip)
       .select('-password')
-      .sort(sort as any);
+      .sort(sort);
 
     return { results, totalPages };
   }

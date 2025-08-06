@@ -12,9 +12,7 @@ export class CreateUserDto {
     @IsNotEmpty({message: "Mật khẩu không được để trống"})
     password: string;
 
-    @IsNotEmpty({message: "Số điện thoại không được để trống"})
     phone: string;
-
     address: string;
     image: string;    
 }
