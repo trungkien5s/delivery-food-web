@@ -18,16 +18,18 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
 import { RolesGuard } from '@/auth/passport/roles.guard';
 import { Roles } from '@/decorator/roles.decorator';
+import { Public } from '@/decorator/customize';
 
 @ApiTags('Menus')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
-@ApiBearerAuth()
 @Controller('menus')
 export class MenusController {
   constructor(private readonly menusService: MenusService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+
+  @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('image'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Create a new menu for a restaurant' })
@@ -62,6 +64,7 @@ export class MenusController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Get all menus' })
   @ApiResponse({ status: 200, description: 'List of all menus' })
   findAll() {
@@ -69,6 +72,7 @@ export class MenusController {
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get menu details by ID' })
   @ApiParam({ name: 'id', description: 'ID of the menu to retrieve' })
   @ApiResponse({ status: 200, description: 'Menu details retrieved successfully' })
@@ -76,6 +80,10 @@ export class MenusController {
     return this.menusService.findOne(id);
   }
 
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
   @Put(':id')
   @ApiOperation({ summary: 'Update menu by ID' })
   @ApiParam({ name: 'id', description: 'ID of the menu to update' })
@@ -85,6 +93,10 @@ export class MenusController {
     return this.menusService.update(id, updateMenuDto);
   }
 
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Delete menu by ID' })
   @ApiParam({ name: 'id', description: 'ID of the menu to delete' })

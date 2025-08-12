@@ -13,6 +13,7 @@ import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
 import { RolesGuard } from '@/auth/passport/roles.guard';
 import { Roles } from '@/decorator/roles.decorator';
+import { Public } from '@/decorator/customize';
 
 
 @ApiTags('Restaurants')
@@ -53,6 +54,7 @@ export class RestaurantsController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Get a list of all restaurants' })
   @ApiResponse({ status: 200, description: 'List of restaurants retrieved successfully' })
   findAll() {
@@ -60,6 +62,7 @@ export class RestaurantsController {
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get restaurant details by ID' })
   @ApiParam({ name: 'id', description: 'Restaurant ID' })
   @ApiResponse({ status: 200, description: 'Restaurant details retrieved successfully' })

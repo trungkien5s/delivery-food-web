@@ -1,11 +1,22 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsMongoId } from 'class-validator';
+import { IsArray, IsDateString, IsMongoId, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class CreateOrderDto {
-  @ApiPropertyOptional({ example: '2025-07-02T14:00:00Z', description: 'Thời gian đặt hàng (optional)' })
-  orderTime?: Date;
+  @ApiProperty({ 
+    description: 'Array of CartItem IDs to create order from',
+    example: ['64e3c4ba1f9b8b001a0c1234', '64e3c4ba1f9b8b001a0c5678'],
+    type: [String]
+  })
+  @IsArray()
+  @IsNotEmpty({ each: true })
+  @IsMongoId({ each: true })
+  cartItemIds: string[];
 
-  @ApiProperty({ example: '66f25a1234abc...', description: 'ID nhà hàng muốn đặt' })
-  @IsMongoId({ message: 'restaurantId phải là ObjectId hợp lệ' })
-  restaurantId: string;
+  @ApiPropertyOptional({ 
+    description: 'Optional order time (defaults to current time)',
+    example: '2025-07-02T09:58:01.044Z'
+  })
+  @IsOptional()
+  @IsDateString()
+  orderTime?: Date;
 }

@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, isValidObjectId } from 'mongoose';
+import { InjectModel, Prop } from '@nestjs/mongoose';
+import mongoose, { Model, isValidObjectId } from 'mongoose';
 import { MenuItem, MenuItemDocument } from './schemas/menu.item.schema';
 import { CreateMenuItemDto } from './dto/create-menu.item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu.item.dto';
@@ -22,6 +22,8 @@ constructor(
     @Inject('CLOUDINARY')
     private cloudinary: typeof cloudinaryLib,
   ) {}
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', autopopulate: { select: 'name slug thumbnail' } })
+restaurant: mongoose.Schema.Types.ObjectId;
 
   async create(dto: CreateMenuItemDto, file?: Express.Multer.File) {
     const { menu, categoryId } = dto;
@@ -56,10 +58,16 @@ constructor(
     return this.menuItemModel.create(dataToSave);
   }
 
+// menu.items.service.ts
+async findAll(filter: any = {}) {
+  return this.menuItemModel
+    .find(filter)
+    .populate({ path: 'restaurant', select: '_id name slug address thumbnail avgRating isOpen' })
+    .populate({ path: 'menu', select: '_id name' })
+    .populate({ path: 'categoryId', select: '_id name' })
+    .lean();
+}
 
-  findAll() {
-    return this.menuItemModel.find().populate('menu');
-  }
 
   async findOne(id: string) {
     if (!isValidObjectId(id)) throw new NotFoundException('ID không hợp lệ');

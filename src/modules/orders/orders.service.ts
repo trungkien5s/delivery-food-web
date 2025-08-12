@@ -16,7 +16,6 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { Shipper, ShipperDocument } from '../shippers/schemas/shipper.schema';
 import { ShipperService } from '../shippers/shipper.service';
 
-// Định nghĩa interfaces cho populated data
 interface PopulatedMenuItemDocument extends Omit<MenuItem, 'menu'> {
   _id: Types.ObjectId;
   menu: {
@@ -60,6 +59,145 @@ export class OrdersService {
     private readonly shipperService: ShipperService,
   ) {}
 
+  // Phương thức tạo đơn hàng từ CartItem cụ thể
+  async createFromCartItems(userId: string, cartItemIds: string[], orderTime?: Date): Promise<OrderDocument> {
+    // Validate cartItemIds
+    if (!cartItemIds || cartItemIds.length === 0) {
+      throw new BadRequestException('Danh sách CartItem không được rỗng');
+    }
+
+    // Validate ObjectIds
+    for (const id of cartItemIds) {
+      if (!isValidObjectId(id)) {
+        throw new BadRequestException(`CartItem ID không hợp lệ: ${id}`);
+      }
+    }
+
+    // Lấy cart của user
+    const cart = await this.cartModel.findOne({ user: userId });
+    if (!cart) {
+      throw new NotFoundException('Không tìm thấy giỏ hàng');
+    }
+
+    // Lấy các CartItem được chọn
+    const cartItems = await this.cartItemModel
+      .find({ 
+        _id: { $in: cartItemIds },
+        cart: cart._id // Đảm bảo CartItem thuộc về cart của user
+      })
+      .populate({
+        path: 'menuItem',
+        populate: {
+          path: 'menu',
+          populate: { path: 'restaurant' },
+        },
+      })
+      .populate({
+        path: 'selectedOptions',
+        select: 'priceAdjustment',
+      }) as unknown as PopulatedCartItemDocument[];
+
+    if (cartItems.length === 0) {
+      throw new NotFoundException('Không tìm thấy CartItem nào phù hợp');
+    }
+
+    if (cartItems.length !== cartItemIds.length) {
+      throw new BadRequestException('Một số CartItem không tồn tại hoặc không thuộc về giỏ hàng của bạn');
+    }
+
+    // Kiểm tra tất cả CartItem phải cùng nhà hàng
+    const restaurantIds = [...new Set(cartItems.map(item => 
+      item.menuItem?.menu?.restaurant?._id?.toString()
+    ))];
+
+    if (restaurantIds.length !== 1 || !restaurantIds[0]) {
+      throw new BadRequestException('Tất cả món phải thuộc cùng một nhà hàng');
+    }
+
+    const restaurantId = restaurantIds[0];
+
+    // Gom món giống nhau (cùng menuItem và cùng selectedOptions)
+    const itemMap = new Map<string, GroupedCartItem>();
+    
+    for (const item of cartItems) {
+      const menuItemId = item.menuItem._id.toString();
+      const selectedOptionIds = item.selectedOptions
+        .map(opt => opt._id.toString())
+        .sort();
+      const key = `${menuItemId}::${selectedOptionIds.join(',')}`;
+
+      if (!itemMap.has(key)) {
+        itemMap.set(key, {
+          menuItem: item.menuItem,
+          quantity: item.quantity,
+          selectedOptions: item.selectedOptions,
+        });
+      } else {
+        const existing = itemMap.get(key)!;
+        existing.quantity += item.quantity;
+      }
+    }
+
+    // Tính tổng giá
+    let totalPrice = 0;
+    for (const { menuItem, quantity, selectedOptions } of itemMap.values()) {
+      const optionExtra = selectedOptions.reduce(
+        (sum, opt) => sum + (opt.priceAdjustment || 0),
+        0
+      );
+      const itemPrice = (menuItem.basePrice + optionExtra) * quantity;
+      totalPrice += itemPrice;
+    }
+
+    const now = orderTime || new Date();
+    const deliveryTime = new Date(now.getTime() + 45 * 60 * 1000); // 45 phút sau
+
+    // Tạo đơn hàng
+    const order = await this.orderModel.create({
+      user: userId,
+      restaurant: restaurantId,
+      totalPrice,
+      status: OrderStatus.PENDING,
+      orderTime: now,
+      deliveryTime,
+    });
+
+    // Tạo orderDetail cho từng nhóm món
+    for (const { menuItem, quantity, selectedOptions } of itemMap.values()) {
+      const optionExtra = selectedOptions.reduce(
+        (sum, opt) => sum + (opt.priceAdjustment || 0),
+        0
+      );
+      const price = (menuItem.basePrice + optionExtra) * quantity;
+
+      await this.orderDetailModel.create({
+        order: order._id,
+        menuItem: menuItem._id,
+        quantity,
+        selectedOptions: selectedOptions.map(opt => opt._id),
+        price,
+      });
+    }
+
+    // Xóa các CartItem đã đặt hàng khỏi giỏ hàng
+    await this.cartItemModel.deleteMany({
+      _id: { $in: cartItemIds }
+    });
+
+    // Trả về order đã populate
+    const populatedOrder = await this.orderModel
+      .findById(order._id)
+      .populate('user')
+      .populate('restaurant');
+
+    if (!populatedOrder) {
+      throw new NotFoundException('Không thể tìm thấy đơn hàng vừa tạo');
+    }
+
+    return populatedOrder;
+  }
+
+  // Phương thức tạo đơn hàng từ toàn bộ cart của một nhà hàng (giữ lại để backward compatibility)
   async createFromCart(userId: string, restaurantId: string, orderTime?: Date): Promise<OrderDocument> {
     const cart = await this.cartModel.findOne({ user: userId });
     if (!cart) {
@@ -94,86 +232,9 @@ export class OrdersService {
       throw new BadRequestException('Không có món nào thuộc nhà hàng đã chọn');
     }
 
-    // Gom món giống nhau
-    const itemMap = new Map<string, GroupedCartItem>();
-    
-    for (const item of items) {
-      const menuItemId = item.menuItem._id.toString();
-      const selectedOptionIds = item.selectedOptions
-        .map(opt => opt._id.toString())
-        .sort();
-      const key = `${menuItemId}::${selectedOptionIds.join(',')}`;
-
-      if (!itemMap.has(key)) {
-        itemMap.set(key, {
-          menuItem: item.menuItem,
-          quantity: item.quantity,
-          selectedOptions: item.selectedOptions,
-        });
-      } else {
-        const existing = itemMap.get(key)!;
-        existing.quantity += item.quantity;
-      }
-    }
-
-    // Tính tổng giá
-    let totalPrice = 0;
-    for (const { menuItem, quantity, selectedOptions } of itemMap.values()) {
-      const optionExtra = selectedOptions.reduce(
-        (sum, opt) => sum + (opt.priceAdjustment || 0),
-        0
-      );
-      const itemPrice = (menuItem.basePrice + optionExtra) * quantity;
-      totalPrice += itemPrice;
-    }
-
-    const now = orderTime || new Date();
-    const deliveryTime = new Date(now.getTime() + 45 * 60 * 1000);
-
-    // Tạo đơn hàng
-    const order = await this.orderModel.create({
-      user: userId,
-      restaurant: restaurantId,
-      totalPrice,
-      status: OrderStatus.PENDING,
-      orderTime: now,
-      deliveryTime,
-    });
-
-    // Tạo orderDetail
-    for (const { menuItem, quantity, selectedOptions } of itemMap.values()) {
-      const optionExtra = selectedOptions.reduce(
-        (sum, opt) => sum + (opt.priceAdjustment || 0),
-        0
-      );
-      const price = (menuItem.basePrice + optionExtra) * quantity;
-
-      await this.orderDetailModel.create({
-        order: order._id,
-        menuItem: menuItem._id,
-        quantity,
-        selectedOptions: selectedOptions.map(opt => opt._id),
-        price,
-      });
-    }
-
-    // Xoá các món thuộc nhà hàng vừa đặt
-    const menuItemIds = items.map(item => item.menuItem._id);
-    await this.cartItemModel.deleteMany({
-      cart: cart._id,
-      menuItem: { $in: menuItemIds },
-    });
-
-    const populatedOrder = await this.orderModel
-      .findById(order._id)
-      .populate('user')
-      .populate('restaurant');
-
-    if (!populatedOrder) {
-      throw new NotFoundException('Không thể tìm thấy đơn hàng vừa tạo');
-    }
-
-    return populatedOrder;
+    // Sử dụng lại logic tương tự như createFromCartItems
+    const cartItemIds = items.map(item => item._id.toString());
+    return this.createFromCartItems(userId, cartItemIds, orderTime);
   }
 
   async updateStatus(orderId: string, status: OrderStatus): Promise<OrderDocument> {

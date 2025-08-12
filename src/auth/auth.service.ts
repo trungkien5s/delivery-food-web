@@ -30,7 +30,7 @@ export class AuthService {
     }
     const payload = { username: user.email, sub: user._id, role: user.role };
     const accessToken = this.jwtService.sign(payload, {
-  expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRED, 
+    expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRED, 
 });
 
     // Tạo refresh token (có thể là chuỗi ngẫu nhiên hoặc JWT)

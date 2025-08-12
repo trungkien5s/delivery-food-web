@@ -10,6 +10,7 @@ export type CartItemDocument = HydratedDocument<CartItem>;
 export class CartItem {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Cart', required: true })
   cart: mongoose.Schema.Types.ObjectId;
+  
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true })
   menuItem: mongoose.Schema.Types.ObjectId;

@@ -15,19 +15,23 @@
   import { UpdateUserDto } from './dto/update-user.dto';
   import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
   import { ResetPasswordDto } from './dto/reset-password.dto';
+
   import {
     ApiTags,
     ApiOperation,
     ApiQuery,
     ApiParam,
     ApiBody,
-    ApiBearerAuth
+    ApiBearerAuth,
+    ApiResponse
   } from '@nestjs/swagger';
   import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
   import { Public } from '@/decorator/customize';
   import { Roles } from '@/decorator/roles.decorator';
   import { RolesGuard } from '@/auth/passport/roles.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { VerifyResetCodeDto } from './dto/verify-resetcode.dto';
+import { UserProfileDto } from './dto/user-profile.dto';
 
   @ApiTags('Accounts')
   @Controller('accounts')
@@ -53,12 +57,14 @@ import { ChangePasswordDto } from './dto/change-password.dto';
     }
 
     @Get('me')
-    @ApiOperation({ summary: 'Retrieve Current Account' })
-    @UseGuards(JwtAuthGuard)
-    @ApiBearerAuth()
-    getCurrentUser(@Request() req) {
-      return this.usersService.findOne(req.user._id);
-    }
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@ApiOperation({ summary: 'Retrieve current user profile' })
+@ApiResponse({ status: 200, type: UserProfileDto })
+getCurrentUser(@Request() req): Promise<UserProfileDto> {
+  return this.usersService.findOne(req.user._id);
+}
+
 
     @Put('me')
     @ApiOperation({ summary: 'Update Existing Account' })
@@ -118,18 +124,23 @@ changePassword(@Request() req, @Body() dto: ChangePasswordDto) {
       return this.usersService.remove(id);
     }
 
-    @Post('password-reset-request')
-    @Public()
-    @ApiOperation({ summary: 'Request Password Reset' })
-    @ApiBody({ type: RequestPasswordResetDto })
-    requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
-      return this.usersService.requestPasswordReset(dto.email);
-    }
+ @Post('password-reset-request')
+@Public()
+@ApiOperation({ summary: 'Request Password Reset' })
+requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+  return this.usersService.requestPasswordReset(dto.email);
+}
+
+@Post('verify-reset-code')
+@Public()
+@ApiOperation({ summary: 'Verify reset code' })
+verifyResetCode(@Body() dto: VerifyResetCodeDto) {
+  return this.usersService.verifyResetCode(dto.email, dto.code);
+}
 
 @Post('reset-password')
 @Public()
 @ApiOperation({ summary: 'Reset password' })
-@ApiBody({ type: ResetPasswordDto })
 resetPassword(@Body() dto: ResetPasswordDto) {
   return this.usersService.resetPassword(dto.resetCode, dto.newPassword);
 }

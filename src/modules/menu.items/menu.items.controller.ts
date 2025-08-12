@@ -8,6 +8,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
 import { RolesGuard } from '@/auth/passport/roles.guard';
 import { Roles } from '@/decorator/roles.decorator';
+import { Public } from '@/decorator/customize';
 
 @ApiTags('Menu Items')
 @Controller('menu-items')
@@ -39,7 +40,7 @@ export class MenuItemsController {
     return this.service.create(dto, file);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'Get all menu items' })
@@ -47,6 +48,7 @@ export class MenuItemsController {
     return this.service.findAll();
   }
 
+  @Public()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get(':id')

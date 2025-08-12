@@ -15,6 +15,7 @@ import { CategoriesService } from './category.service';
 import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
 import { RolesGuard } from '@/auth/passport/roles.guard';
 import { Roles } from '@/decorator/roles.decorator';
+import { Public } from '@/decorator/customize';
 
 @ApiTags('Categories')
 @Controller('categories')
@@ -32,12 +33,14 @@ export class CategoriesController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Get all categories' })
   findAll() {
     return this.categoriesService.findAll();
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get category details by ID' })
   findOne(@Param('id') id: string) {
     return this.categoriesService.findOne(id);

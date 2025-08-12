@@ -9,19 +9,20 @@ import { OrderStatus } from './schemas/order.schema';
 import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
 import { RolesGuard } from '@/auth/passport/roles.guard';
 import { Roles } from '@/decorator/roles.decorator';
+
 @ApiTags('Orders')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post('')
-  @ApiOperation({ summary: 'Create a new order from cart' })
+  @ApiOperation({ summary: 'Create a new order from selected cart items' })
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiBody({ type: CreateOrderDto })
   @ApiResponse({
     status: 201,
-    description: 'Successfully created order from cart',
+    description: 'Successfully created order from selected cart items',
     schema: {
       example: {
         _id: '64e3c4ba1f9b8b001a0c1234',
@@ -35,7 +36,31 @@ export class OrdersController {
     }
   })
   createFromCart(@Req() req, @Body() dto: CreateOrderDto) {
-    return this.ordersService.createFromCart(req.user._id, dto.restaurantId, dto.orderTime);
+    return this.ordersService.createFromCartItems(req.user._id, dto.cartItemIds, dto.orderTime);
+  }
+
+  @Post('restaurant/:restaurantId')
+  @ApiOperation({ summary: 'Create a new order from all cart items of a restaurant' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiParam({ name: 'restaurantId', description: 'Restaurant ID' })
+  @ApiBody({ 
+    schema: {
+      example: {
+        orderTime: '2025-07-02T09:58:01.044Z'
+      }
+    }
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Successfully created order from all cart items of the restaurant',
+  })
+  createFromRestaurantCart(
+    @Req() req, 
+    @Param('restaurantId') restaurantId: string,
+    @Body() dto: { orderTime?: Date }
+  ) {
+    return this.ordersService.createFromCart(req.user._id, restaurantId, dto.orderTime);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -175,4 +200,3 @@ export class OrdersController {
     return this.ordersService.updateStatusByShipper(id, dto.shipperId, dto.status);
   }
 }
-

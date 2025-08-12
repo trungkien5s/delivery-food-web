@@ -12,6 +12,8 @@ import dayjs from 'dayjs';
 import { v4 as uuidv4 } from 'uuid';
 import { MailerService } from '@nestjs-modules/mailer';
 import * as bcrypt from 'bcrypt';
+import { plainToInstance } from 'class-transformer';
+import { UserProfileDto } from './dto/user-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -93,18 +95,21 @@ for (const key in parsedSort) {
 }
 
 
-async findOne(id: string) {
+async findOne(id: string): Promise<UserProfileDto> {
   if (!mongoose.isValidObjectId(id)) {
     throw new BadRequestException('Id không đúng định dạng');
   }
 
-  const user = await this.userModel.findById(id).select('-password');
+  const user = await this.userModel
+    .findById(id)
+    .select('-password -refreshToken -activationCode -activationCodeExpiry -resetCode -resetCodeExpire');
 
   if (!user) {
     throw new NotFoundException('Không tìm thấy người dùng');
   }
 
-  return user;
+  // Convert Document -> DTO
+  return plainToInstance(UserProfileDto, user.toObject());
 }
 
 
@@ -194,6 +199,20 @@ await this.mailerService.sendMail({
 
     return { message: 'Đã gửi email reset password' };
   }
+
+  async verifyResetCode(email: string, code: string) {
+  const user = await this.userModel.findOne({ email, resetCode: code });
+
+  if (!user) {
+    throw new BadRequestException('Mã xác nhận không đúng');
+  }
+
+  if (user.codeExpired < new Date()) {
+    throw new BadRequestException('Mã xác nhận đã hết hạn');
+  }
+
+  return { message: 'Mã xác nhận hợp lệ' };
+}
 
 async resetPassword(code: string, newPassword: string) {
   const user = await this.userModel.findOne({ resetCode: code });
